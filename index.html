@@ -151,6 +151,7 @@
         <div class="keyboard-help">
             <strong>Keyboard Controls:</strong><br>
             Z/Q/S/D - Free camera movement<br>
+            A/E - Rotate camera around locked planet<br>
             Click planet - Lock camera on planet
         </div>
     </div>
@@ -158,7 +159,7 @@
     <div id="controls">
         <div class="control-group">
             <label>Animation Speed</label>
-            <input type="range" id="speedControl" min="0" max="5" step="0.1" value="1">
+            <input type="range" id="speedControl" min="0" max="5" step="0.1" value="0.5">
         </div>
         <div class="control-group">
             <button id="playPause">Pause</button>
@@ -184,13 +185,13 @@
             this.renderer = new THREE.WebGLRenderer({antialias: true});
             this.planets = [];
             this.moons = [];
-            this.animationSpeed = 1;
+            this.animationSpeed = 0.5;
             this.isPlaying = true;
             this.raycaster = new THREE.Raycaster();
             this.mouse = new THREE.Vector2();
 
             // Camera control variables
-            this.cameraRadius = 150;
+            this.cameraRadius = 100;
             this.cameraTheta = 0;
             this.cameraPhi = Math.PI / 4;
             this.isMouseDown = false;
@@ -204,11 +205,13 @@
                 z: false,
                 q: false,
                 s: false,
-                d: false
+                d: false,
+                a: false,
+                e: false,
             };
             this.freeCameraMode = false;
             this.freeCameraPosition = new THREE.Vector3();
-            this.freeCameraSpeed = 2;
+            this.freeCameraSpeed = 1;
 
             this.planetData = {
                 sun: {name: "Sun", details: "The center of our solar system. A G-type main-sequence star."},
@@ -500,9 +503,11 @@
 
         setupControls() {
             const updateCameraPosition = () => {
-                this.camera.position.x = this.cameraRadius * Math.sin(this.cameraPhi) * Math.cos(this.cameraTheta);
+                if (!this.lockedPlanet) {
+                    this.camera.position.x = this.cameraRadius * Math.sin(this.cameraPhi) * Math.cos(this.cameraTheta);
+                    this.camera.position.z = this.cameraRadius * Math.sin(this.cameraPhi) * Math.sin(this.cameraTheta);
+                }
                 this.camera.position.y = this.cameraRadius * Math.cos(this.cameraPhi);
-                this.camera.position.z = this.cameraRadius * Math.sin(this.cameraPhi) * Math.sin(this.cameraTheta);
                 this.camera.lookAt(0, 0, 0);
             };
 
@@ -534,6 +539,7 @@
             });
 
             this.renderer.domElement.addEventListener('wheel', (event) => {
+                console.log(event)
                 this.cameraRadius += event.deltaY * 0.1;
                 this.cameraRadius = Math.max(20, Math.min(500, this.cameraRadius));
                 updateCameraPosition();
@@ -561,15 +567,17 @@
             // Keyboard controls
             document.addEventListener('keydown', (event) => {
                 const key = event.key.toLowerCase();
-                if (['z', 'q', 's', 'd'].includes(key)) {
+                if (['z', 'q', 's', 'd', 'a', 'e'].includes(key)) {
                     this.keys[key] = true;
-                    this.enableFreeCamera();
+                    if (['z', 'q', 's', 'd'].includes(key)) {
+                        this.enableFreeCamera();
+                    }
                 }
             });
 
             document.addEventListener('keyup', (event) => {
                 const key = event.key.toLowerCase();
-                if (['z', 'q', 's', 'd'].includes(key)) {
+                if (['z', 'q', 's', 'd', 'a', 'e'].includes(key)) {
                     this.keys[key] = false;
                 }
             });
@@ -621,7 +629,7 @@
             this.camera.position.set(0, 50, 100);
             this.camera.lookAt(0, 0, 0);
             this.freeCameraPosition.copy(this.camera.position);
-            this.cameraRadius = 150;
+            this.cameraRadius = 100;
             this.cameraTheta = 0;
             this.cameraPhi = Math.PI / 4;
             this.lockedPlanet = null;
@@ -678,9 +686,21 @@
 
             targetPosition.add(offset);
 
+            const lerpSpeed = 0.05; // Speed of the interpolation
+
             // Smooth camera movement
-            this.camera.position.lerp(targetPosition, 0.05);
+            // this.camera.position.lerp(targetPosition.x, 0.05);
+            this.camera.position.x = THREE.MathUtils.lerp(this.camera.position.x, targetPosition.x, lerpSpeed);
+            this.camera.position.z = THREE.MathUtils.lerp(this.camera.position.z, targetPosition.z, lerpSpeed);
+
             this.camera.lookAt(this.lockedPlanet.position);
+
+            if (this.keys.e) {
+                this.cameraOffset.applyAxisAngle(new THREE.Vector3(0, 1, 0), 0.02);
+            }
+            if (this.keys.a) {
+                this.cameraOffset.applyAxisAngle(new THREE.Vector3(0, 1, 0), -0.02);
+            }
         }
 
         showPlanetInfo(info) {
